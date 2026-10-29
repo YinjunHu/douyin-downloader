@@ -49,7 +49,7 @@ export default function HistoryViewer() {
 
   const fetchStats = async () => {
     try {
-      const res = await axios.get('http://127.0.0.1:8000/api/history/stats');
+      const res = await axios.get('/api/history/stats');
       setStats(res.data);
     } catch { /* 忽略 */ }
   };
@@ -57,7 +57,7 @@ export default function HistoryViewer() {
   const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axios.get('http://127.0.0.1:8000/api/history/aweme', {
+      const res = await axios.get('/api/history/aweme', {
         params: { limit: PAGE_SIZE, offset: page * PAGE_SIZE, keyword, author },
       });
       setItems(res.data.items);
@@ -86,7 +86,7 @@ export default function HistoryViewer() {
 
   const openFolder = async (filePath: string) => {
     try {
-      await axios.post('http://127.0.0.1:8000/api/history/open_folder', { file_path: filePath });
+      await axios.post('/api/history/open_folder', { file_path: filePath });
     } catch {
       alert('无法打开文件夹，文件可能已被移动或删除');
     }
@@ -105,7 +105,7 @@ export default function HistoryViewer() {
   const saveRename = async () => {
     if (!editingId || !editingTitle.trim()) return;
     try {
-      await axios.post('http://127.0.0.1:8000/api/history/rename', {
+      await axios.post('/api/history/rename', {
         aweme_id: editingId,
         new_title: editingTitle.trim(),
       });

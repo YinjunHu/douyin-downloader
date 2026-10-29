@@ -2,11 +2,12 @@ import asyncio
 import aiosqlite
 from typing import Dict, Any, Optional
 from datetime import datetime
+from utils.paths import get_data_dir
 
 
 class Database:
-    def __init__(self, db_path: str = 'dy_downloader.db'):
-        self.db_path = db_path
+    def __init__(self, db_path: str = None):
+        self.db_path = db_path or str(get_data_dir() / 'dy_downloader.db')
         self._initialized = False
         self._conn: Optional[aiosqlite.Connection] = None
         self._conn_lock = asyncio.Lock()

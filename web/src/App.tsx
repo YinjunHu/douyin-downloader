@@ -23,7 +23,11 @@ function App() {
     setTermOutput([]) // Clear
     
     // 打开 WebSocket
-    const ws = new WebSocket('ws://127.0.0.1:8000/api/task/ws')
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    // 如果是开发环境 (使用 Vite 默认的 8899 端口服务时)，我们用 23851 的 ws；如果是生产环境同源提供，直接挂载。
+    const targetWsUrl = import.meta.env.DEV ? 'ws://127.0.0.1:23851/api/task/ws' : `${protocol}//${host}/api/task/ws`;
+    const ws = new WebSocket(targetWsUrl)
     ws.onopen = () => {
       ws.send(JSON.stringify({ command: cmd }))
     }

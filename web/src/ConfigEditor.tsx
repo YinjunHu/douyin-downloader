@@ -7,6 +7,9 @@ export default function ConfigEditor() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [fetchingCookies, setFetchingCookies] = useState(false);
+  const [showRawCookieBox, setShowRawCookieBox] = useState(false);
+  const [rawCookieText, setRawCookieText] = useState('');
 
   const extractUrl = (text: string): string => {
     if (!text) return text;
@@ -20,7 +23,7 @@ export default function ConfigEditor() {
   const fetchConfig = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('http://127.0.0.1:8000/api/config/');
+      const res = await axios.get('/api/config/');
       const data = res.data;
       // 对已保存的链接进行提纯
       if (Array.isArray(data.link)) {
@@ -53,7 +56,7 @@ export default function ConfigEditor() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await axios.post('http://127.0.0.1:8000/api/config/', config);
+      await axios.post('/api/config/', config);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (e) {
@@ -103,8 +106,31 @@ export default function ConfigEditor() {
 
   const addLink = () => {
     setConfig((prev: any) => {
-      return { ...prev, link: [...(prev.link || []), ''] };
+      return { ...prev, link: ['', ...(prev.link || [])] };
     });
+  };
+
+  const parseRawCookie = () => {
+    if (!rawCookieText.trim()) return;
+    const keys = ["msToken", "ttwid", "odin_tt", "passport_csrf_token", "sid_guard"];
+    const extracted: Record<string, string> = {};
+    
+    keys.forEach(k => {
+      const regex = new RegExp(`${k}=([^;\\s]+)`);
+      const match = rawCookieText.match(regex);
+      if (match) extracted[k] = match[1].trim();
+    });
+    
+    if (Object.keys(extracted).length === 0) {
+      alert("未能解析出任何关键 Cookie 字段，请确保粘贴了正确的文本。");
+      return;
+    }
+    
+    const newConfig = { ...config, cookies: { ...(config.cookies || {}), ...extracted } };
+    setConfig(newConfig);
+    setRawCookieText('');
+    setShowRawCookieBox(false);
+    alert(`成功解析并填充了 ${Object.keys(extracted).length} 个字段：\n${Object.keys(extracted).join(', ')}`);
   };
 
   const removeLink = (index: number) => {
@@ -117,7 +143,7 @@ export default function ConfigEditor() {
 
   const pickFolder = async () => {
     try {
-      const res = await axios.post('http://127.0.0.1:8000/api/config/pick_folder');
+      const res = await axios.post('/api/config/pick_folder');
       if (res.data && res.data.path) {
         handleChange('path', res.data.path);
       }
@@ -181,7 +207,9 @@ export default function ConfigEditor() {
         {/* 1. 基础检索设置 - 目标链接 */}
         <div className="glass-panel" style={{ padding: '24px' }}>
           <h3 style={{ marginTop: 0, color: '#00f0ff' }}>1. 目标链接管理 (Links)</h3>
-          
+          <button onClick={addLink} className="button-primary" style={{ alignSelf: 'flex-start', background: 'rgba(0, 240, 255, 0.1)', color: '#00f0ff', padding: '8px 16px', fontSize: '0.9rem', marginBottom: '12px' }}>
+              <Plus size={16} /> 新增一条下载链接
+          </button>
           <div className="form-group">
             {(config.link || []).map((url: string, idx: number) => {
               const isIgnored = url.startsWith('#');
@@ -231,9 +259,7 @@ export default function ConfigEditor() {
                 </div>
               );
             })}
-            <button onClick={addLink} className="button-primary" style={{ alignSelf: 'flex-start', background: 'rgba(0, 240, 255, 0.1)', color: '#00f0ff', padding: '8px 16px', fontSize: '0.9rem', marginTop: '4px' }}>
-              <Plus size={16} /> 新增一条下载链接
-            </button>
+
           </div>
 
           <div className="form-group" style={{ marginTop: '24px' }}>
@@ -362,7 +388,85 @@ export default function ConfigEditor() {
         
         {/* 4. 平台反爬与代理 */}
         <div className="glass-panel" style={{ padding: '24px' }}>
-          <h3 style={{ marginTop: 0, color: '#facc15' }}>4. 逆向与网络安全 (Network & Fallback)</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+            <h3 style={{ margin: 0, color: '#facc15' }}>4. 逆向与网络安全 (Network & Fallback)</h3>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                  className="button-primary"
+                  onClick={() => setShowRawCookieBox(!showRawCookieBox)}
+                  style={{
+                    background: showRawCookieBox ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255,255,255,0.05)',
+                    color: showRawCookieBox ? '#38bdf8' : '#cbd5e1',
+                    padding: '8px 16px',
+                  }}
+              >
+                📝 解析纯文本 Cookie (免扫码)
+              </button>
+              <button 
+                  className="button-primary"
+                  onClick={async () => {
+                    setFetchingCookies(true);
+                    try {
+                      const res = await axios.get('/api/config/fetch_cookie');
+                      if (res.data?.data) {
+                        const newConfig = { ...config, ...res.data.data };
+                        setConfig(newConfig);
+                        alert('成功拉取并自动载入了 Cookie！记得最后点击顶部“全量保存配置”哦。');
+                      }
+                    } catch (e: any) {
+                      alert('获取失败: ' + (e.response?.data?.detail || e.message));
+                    } finally {
+                      setFetchingCookies(false);
+                    }
+                  }}
+                  disabled={fetchingCookies}
+                  style={{
+                    background: fetchingCookies ? 'rgba(16, 185, 129, 0.4)' : 'rgba(16, 185, 129, 0.1)',
+                    color: '#10b981',
+                    padding: '8px 16px',
+                    border: '1px solid currentColor'
+                  }}
+              >
+                {fetchingCookies ? (
+                  <> <RefreshCw className="spin" size={16} /> 等待终端扫码中... </>
+                ) : (
+                  <> 📸 一键扫码自动获取并填充 </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {fetchingCookies && (
+            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '8px', marginBottom: '16px', borderLeft: '4px solid #10b981' }}>
+              正在弹起安全扫码视窗，请在终端窗口扫码登录后直接关闭视窗...
+            </div>
+          )}
+
+          {showRawCookieBox && (
+            <div style={{ background: 'rgba(56, 189, 248, 0.05)', padding: '16px', borderRadius: '8px', marginBottom: '24px', borderLeft: '4px solid #38bdf8' }}>
+              <div style={{ marginBottom: '12px', fontSize: '0.9rem', color: '#94a3b8', lineHeight: '1.6' }}>
+                <p style={{ margin: '0 0 8px 0', color: '#38bdf8', fontWeight: 'bold' }}>小白专属获取教程（无惧风控与后门）：</p>
+                <ol style={{ margin: '0 0 12px 16px', padding: 0 }}>
+                  <li>在 Edge/Chrome 浏览器中打开并登录抖音电脑版。</li>
+                  <li>按下 <b>F12</b> 打开开发者工具，并在上方选择 <b>Network (网络)</b> 面板。</li>
+                  <li>点击过滤标签 <b>Fetch/XHR</b>，在下面刷出的列表里随便点一个接口（比如 <code>progress</code> 或 <code>stats</code>）。</li>
+                  <li>在右侧依次滑过 General 和 Response Headers，找到 <b>Request Headers (请求头)</b>。</li>
+                  <li>找到一行开头叫 <b><code>Cookie:</code></b> 的长串字符，<b>鼠标右键全部复制</b>，粘贴在下面：</li>
+                </ol>
+              </div>
+              <textarea 
+                rows={4} 
+                value={rawCookieText}
+                onChange={e => setRawCookieText(e.target.value)}
+                placeholder="在此粘贴 Request Headers 里的那行又长又乱的 Cookie 文本..."
+                style={{ width: '100%', marginBottom: '12px', resize: 'vertical' }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button className="button-primary" style={{ background: 'rgba(255,255,255,0.1)' }} onClick={() => setShowRawCookieBox(false)}>取消</button>
+                <button className="button-primary" style={{ background: '#38bdf8', color: '#0f172a' }} onClick={parseRawCookie}>解析并自动填充</button>
+              </div>
+            </div>
+          )}
 
           <div className="form-group">
             <label>透明网络代理 (Proxy) - 例如 http://127.0.0.1:7890</label>

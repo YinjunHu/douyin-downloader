@@ -1,13 +1,14 @@
+import os
 import sqlite3
 import subprocess
-import os
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import List, Dict, Any
+from utils.paths import get_data_dir
 
 router = APIRouter()
-DB_PATH = Path(__file__).parent.parent.parent / "dy_downloader.db"
+DB_PATH = get_data_dir() / "dy_downloader.db"
 
 
 def _get_conn():

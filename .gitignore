@@ -44,3 +44,16 @@ config*.yml
 .cookies.json
 config/cookies.json
 .omx/
+*.bak
+
+# Local build/obfuscation tooling (depends on .pyarmor output, not shareable)
+.pyarmor/
+desktop_app.spec
+
+# Local scratch scripts (absolute paths, not portable)
+tmp_copy.py
+make_ico.py
+make_icon.py
+
+# Tooling workspace data
+.workbuddy/

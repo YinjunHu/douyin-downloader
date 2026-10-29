@@ -5,8 +5,13 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
 router = APIRouter()
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-# We enforce using the .venv python if we are running the server
+
+# 在打包环境下，__file__ 指向 _internal 内部，不能用来推算项目根
+if getattr(sys, 'frozen', False):
+    PROJECT_ROOT = Path(sys.executable).parent
+else:
+    PROJECT_ROOT = Path(__file__).parent.parent.parent
+
 PYTHON_EXE = sys.executable
 
 @router.websocket("/ws")
@@ -19,9 +24,9 @@ async def websocket_endpoint(websocket: WebSocket):
         
         args = []
         if cmd_type == "download":
-            args = [PYTHON_EXE, "run.py"]
+            args = [PYTHON_EXE, "--run-download"] if getattr(sys, 'frozen', False) else [PYTHON_EXE, "run.py"]
         elif cmd_type == "whisper":
-            args = [PYTHON_EXE, "cli/whisper_transcribe.py"]
+            args = [PYTHON_EXE, "--run-whisper"] if getattr(sys, 'frozen', False) else [PYTHON_EXE, "cli/whisper_transcribe.py"]
         else:
             await websocket.send_text("Error: Unknown command")
             await websocket.close()

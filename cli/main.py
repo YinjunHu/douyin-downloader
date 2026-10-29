@@ -128,10 +128,12 @@ async def download_url(
 async def main_async(args):
     display.show_banner()
 
+    from utils.paths import get_data_dir
+
     if args.config:
         config_path = args.config
     else:
-        config_path = 'config.yml'
+        config_path = str(get_data_dir() / 'config.yml')
 
     if not Path(config_path).exists():
         display.print_error(f"Config file not found: {config_path}")

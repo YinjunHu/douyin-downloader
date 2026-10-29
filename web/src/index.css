@@ -134,6 +134,9 @@ h1 {
   height: 300px;
   overflow-y: auto;
   font-size: 0.85rem;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
 }
 
 .terminal-line { margin: 4px 0; white-space: pre-wrap; }

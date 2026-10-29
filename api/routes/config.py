@@ -2,9 +2,10 @@ import yaml
 from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from typing import Dict, Any
+from utils.paths import get_data_dir
 
 router = APIRouter()
-CONFIG_PATH = Path(__file__).parent.parent.parent / "config.yml"
+CONFIG_PATH = get_data_dir() / "config.yml"
 
 @router.get("/")
 def get_config() -> Dict[str, Any]:
@@ -28,6 +29,7 @@ def get_config() -> Dict[str, Any]:
 
 @router.post("/")
 def save_config(config_data: Dict[str, Any]):
+    
     if CONFIG_PATH.exists():
         backup_path = CONFIG_PATH.with_suffix(".yml.bak")
         backup_path.write_text(CONFIG_PATH.read_text(encoding="utf-8"), encoding="utf-8")
@@ -58,21 +60,81 @@ def save_config(config_data: Dict[str, Any]):
 
 @router.post("/pick_folder")
 def pick_folder():
-    import tkinter as tk
-    from tkinter import filedialog
+    import subprocess
     
-    # Needs to be run in a way that doesn't block FastAPI usually, 
-    # but considering this runs locally for a single user, blocking is fine.
-    root = tk.Tk()
-    root.withdraw()
-    root.attributes('-topmost', True)
-    
-    folder_path = filedialog.askdirectory(title="选择下载保存路径")
-    root.destroy()
+    ps_script = (
+        '[System.Reflection.Assembly]::LoadWithPartialName("System.windows.forms") | Out-Null; '
+        '$f = New-Object System.Windows.Forms.FolderBrowserDialog; '
+        '$f.Description = "选择下载保存路径"; '
+        'if ($f.ShowDialog() -eq "OK") { $f.SelectedPath } else { "" }'
+    )
+    result = subprocess.run(
+        ["powershell", "-NoProfile", "-Command", ps_script],
+        capture_output=True, text=True, timeout=120,
+        creationflags=subprocess.CREATE_NO_WINDOW,
+    )
+    folder_path = result.stdout.strip()
     
     if folder_path:
-        # User selected a path
-        return {"path": folder_path.replace('/', '\\')}
+        return {"path": folder_path}
     else:
-        # User canceled
         return {"path": None}
+
+@router.get("/fetch_cookie")
+def fetch_cookie():
+    import sys
+    import json
+    import subprocess
+    from pathlib import Path
+    
+    # 因为 get_data_dir() 获取的是实际的运行时持久化路径
+    # 而 ui_cookie_fetcher.py 是源码文件
+    base = Path(sys.executable).parent if getattr(sys, 'frozen', False) else Path(__file__).parent.parent.parent
+    
+    target_script = base / "_internal" / "utils" / "ui_cookie_fetcher.py"
+    if not target_script.exists():
+        target_script = base / "utils" / "ui_cookie_fetcher.py" # 尝试直接从utils下找
+        
+    if getattr(sys, 'frozen', False) and getattr(sys, '_MEIPASS', None):
+         # MEIPASS 为解压目录方案准备
+         if not target_script.exists():
+              target_script = Path(sys._MEIPASS) / "utils" / "ui_cookie_fetcher.py"
+
+    run_args = [sys.executable, str(target_script)]
+    if getattr(sys, 'frozen', False):
+         # 独立打包模式下 sys.executable 是主程序的exe，直接追加我们约定的触发参数
+         run_args = [sys.executable, "--fetch-cookie"]
+    elif not target_script.exists():
+         raise HTTPException(status_code=500, detail=f"找不到安全扫码核心组件: {target_script}")
+
+    try:
+        # 不使用 startupinfo 隐藏窗口，否则会连带着把扫码浏览器窗口完全隐形
+        process = subprocess.Popen(
+            run_args,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding='utf-8'
+        )
+        stdout_data, _ = process.communicate(timeout=600) # 给 10 分钟慢慢扫
+    except subprocess.TimeoutExpired:
+        process.kill()
+        raise HTTPException(status_code=408, detail="获取超时，用户未能及时扫码")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"内部拉起错误: {str(e)}")
+
+    if not stdout_data.strip():
+         raise HTTPException(status_code=400, detail="提取失败：扫码未完成即被关闭。")
+    
+    # 从最后面开始找，防抖
+    lines = stdout_data.strip().split('\n')
+    for line in reversed(lines):
+        if 'msToken' in line or '{' in line:
+            try:
+                res = json.loads(line)
+                if isinstance(res, dict) and "msToken" in res:
+                    return {"status": "success", "data": res}
+            except:
+                continue
+
+    raise HTTPException(status_code=500, detail=f"解析 Cookie 错误: {stdout_data}")

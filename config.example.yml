@@ -5,13 +5,11 @@
 
 # 1. 下载链接列表 (支持抖音主页、单个视频、图文、合集、音乐链接，可添加多个)
 link:
-  # - https://www.douyin.com/user/MS4wLjABAAAA6O7EZyfDRYXxJrUTpf91K3tmB4rBROkAw-nYMfld8ss
-  - https://www.douyin.com/user/MS4wLjABAAAAWprbGx1RXp-hN0AUNeHTo1mCIBXFL96QBkmhqTek-nvIWHe8vN_7oJ5V2b3HrPfe?from_tab_name=main
-  - https://www.douyin.com/user/MS4wLjABAAAAZjGjZjXrW4wZV4bUtF7hhC9a_J_2fBRa1VihjmeAQso?from_tab_name=main
+  # - https://www.douyin.com/user/xxxxx  # 用户主页示例
+  # - https://v.douyin.com/xxxxx/        # 单个视频示例
 
 # 2. 下载保存路径
-path: D:\导出视频\抖音下载视频\
-# ./Downloaded/
+path: ./Downloaded/
 
 # 3. 附加资源下载开关 (是否连带下载音频、封面、头像、JSON数据)
 music: true
